@@ -12,7 +12,7 @@ import {
   type SimulateOpts,
   type Config,
 } from '@nabz/engine';
-import { buildConfig, SAMPLE_NUMBERS, toFixObj, type ReadNumbers } from './sim';
+import { buildConfig, SAMPLE_NUMBERS, toFixObj, type ReadNumbers, type DischargeRow, type TheatreCase } from './sim';
 import { api, type AskAnswer } from './api/client';
 
 export type Speed = 'slow' | 'normal' | 'fast';
@@ -45,6 +45,9 @@ export interface StoreState {
   // numbers (editable config) + flag
   numbers: ReadNumbers;
   flagYes: boolean;
+  // the actual patients / surgeries read off the photos (empty => use sample identities)
+  discharges: DischargeRow[];
+  theatres: TheatreCase[];
   // scenario
   seed: string;
   now: number;
@@ -89,6 +92,7 @@ export interface StoreState {
   setView: (v: View) => void;
   selectBed: (key: string) => void;
   setViewT: (t: number) => void;
+  skipToNextEvent: () => void;
   play: () => void;
   pause: () => void;
   setSpeed: (s: Speed) => void;
@@ -111,8 +115,8 @@ export interface StoreState {
 
 const STEP_KEYS = ['order', 'summary', 'bill', 'approval'];
 
-function cfgFrom(numbers: ReadNumbers, flagYes: boolean): Partial<Config> {
-  return buildConfig(numbers, flagYes);
+function cfgFrom(numbers: ReadNumbers, flagYes: boolean, theatres?: TheatreCase[]): Partial<Config> {
+  return buildConfig(numbers, flagYes, theatres);
 }
 function optsFrom(s: Pick<StoreState, 'seed' | 'now' | 'shocks'>, extra?: Partial<SimulateOpts>): SimulateOpts {
   return { seed: s.seed, now: s.now, shocks: s.shocks, ...extra };
@@ -124,7 +128,7 @@ function anyDone(done: Record<string, Record<string, boolean>>): boolean {
 
 /** Recompute base/plan/risk from the current scenario. */
 function computed(s: StoreState): Pick<StoreState, 'base' | 'plan' | 'hasPlan' | 'riskBase' | 'riskPlan' | 'view'> {
-  const cfg = cfgFrom(s.numbers, s.flagYes);
+  const cfg = cfgFrom(s.numbers, s.flagYes, s.theatres);
   const base = simulate(cfg, optsFrom(s));
   const hasPlan = Object.keys(s.fixes).length > 0 || anyDone(s.done);
   const plan = hasPlan ? simulate(cfg, optsFrom(s, { fixes: s.fixes as Partial<Record<FixId, boolean>>, done: s.done })) : base;
@@ -170,6 +174,8 @@ export const useStore = create<StoreState>((set, get) => ({
   found: [[], [], []],
   numbers: initial.numbers,
   flagYes: true,
+  discharges: [],
+  theatres: [],
   seed: initial.seed,
   now: initial.now,
   fixes: {},
@@ -211,14 +217,28 @@ export const useStore = create<StoreState>((set, get) => ({
     if (images.length < 3) return;
     set({ reading: true, found: [[], [], []] });
     try {
-      const { numbers: n } = await api.readRegisters(images);
+      const { numbers: r } = await api.readRegisters(images);
+      const n: ReadNumbers = {
+        wardBeds: r.wardBeds,
+        wardOccupied: r.wardOccupied,
+        icuBeds: r.icuBeds,
+        icuOccupied: r.icuOccupied,
+        fitForDischarge: r.fitForDischarge,
+        insured: r.insured,
+        stepDowns: r.stepDowns,
+        plannedAdmissions: r.plannedAdmissions,
+      };
+      const discharges = r.discharges ?? [];
+      const theatres = r.theatres ?? [];
       set({
-        numbers: { ...n },
+        numbers: n,
+        discharges,
+        theatres,
         readDone: true,
         reading: false,
         found: [
           [`${n.wardBeds} ward beds, ${n.wardOccupied} occupied`, `${n.fitForDischarge} fit to go home today`, `${n.insured} of them insured`],
-          [`theatre list read`, `${Math.max(0, n.stepDowns.length)} ICU step-downs expected`],
+          [theatres.length ? `${theatres.length} surgeries on the theatre list` : `theatre list read`, `${theatres.filter((t) => t.icu).length} need an ICU bed afterwards`],
           [`${n.icuBeds} ICU beds`, `${n.plannedAdmissions.length} admissions due this afternoon`],
         ],
       });
@@ -228,6 +248,8 @@ export const useStore = create<StoreState>((set, get) => ({
         reading: false,
         readDone: true,
         numbers: { ...SAMPLE_NUMBERS },
+        discharges: [],
+        theatres: [],
         found: [['Could not read the photos clearly — loaded sensible defaults, please check and correct.'], [], []],
       });
     }
@@ -253,7 +275,7 @@ export const useStore = create<StoreState>((set, get) => ({
     (async () => {
       try {
         const s = get();
-        const reading = await api.createReading(s.numbers);
+        const reading = await api.createReading({ ...s.numbers, discharges: s.discharges, theatres: s.theatres });
         const day = await api.createDay({ readingId: reading.id, seed: s.seed });
         set({ readingId: reading.id, dayId: day.id });
       } catch (e) {
@@ -267,6 +289,13 @@ export const useStore = create<StoreState>((set, get) => ({
   selectBed: (key) => set((s) => ({ sel: s.sel === key ? null : key })),
 
   setViewT: (t) => set({ viewT: Math.max(DAY_START, Math.min(DAY_END, t)) }),
+
+  skipToNextEvent: () => {
+    const s = get();
+    const cur = s.view === 'plan' && s.hasPlan ? s.plan : s.base;
+    const next = cur.events.find((e) => e.t > s.viewT + 0.5 && e.t <= DAY_END);
+    set({ guided: false, playing: false, viewT: next ? next.t : DAY_END });
+  },
 
   play: () => {
     const s = get();
@@ -299,7 +328,7 @@ export const useStore = create<StoreState>((set, get) => ({
     const s = get();
     set({ busy: true, status: 'Testing plans on the twin…' });
     try {
-      const b = await api.bestPlan(cfgFrom(s.numbers, s.flagYes), optsFrom(s));
+      const b = await api.bestPlan(cfgFrom(s.numbers, s.flagYes, s.theatres), optsFrom(s));
       const fixes = toFixObj(b.fixes);
       const names = b.fixes.length
         ? b.fixes
@@ -336,12 +365,13 @@ export const useStore = create<StoreState>((set, get) => ({
     try {
       const res = await api.ask({
         text,
-        cfg: cfgFrom(s.numbers, s.flagYes),
+        cfg: cfgFrom(s.numbers, s.flagYes, s.theatres),
         seed: s.seed,
         now: s.now,
         fixes: s.fixes,
         done: s.done,
         shocks: s.shocks,
+        discharges: s.discharges,
       });
       answer = res.answer;
     } catch (e) {
@@ -370,8 +400,9 @@ export const useStore = create<StoreState>((set, get) => ({
       }
       setTimeout(
         () => {
+          // What-ifs are previews only: the assistant describes the result but we do
+          // NOT mutate today's forecast behind the user's back.
           patch((mm) => (mm.ready = true));
-          if (answer.shock) get().applyShock(answer.shock);
         },
         quick ? 0 : 450,
       );

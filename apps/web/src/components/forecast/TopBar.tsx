@@ -14,6 +14,7 @@ export function TopBar() {
     guided: st.guided,
     play: st.play,
     pause: st.pause,
+    skipToNextEvent: st.skipToNextEvent,
     setView: st.setView,
     setViewT: st.setViewT,
     takeControl: st.takeControl,
@@ -48,6 +49,9 @@ export function TopBar() {
       <div className="topbar-row">
         <button className={'play' + (s.playing ? ' on' : '')} aria-label={s.playing ? 'Pause' : 'Play'} onClick={onPlay}>
           {s.playing ? '❚❚' : '▶'}
+        </button>
+        <button className="play skip" aria-label="Skip to the next thing that happens" title="Skip to the next thing that happens" onClick={s.skipToNextEvent} disabled={s.viewT >= DAY_END}>
+          ⏭
         </button>
         <span className={'bigclock' + (s.viewT > s.now ? ' fut' : '')}>{fmt(s.viewT)}</span>
 

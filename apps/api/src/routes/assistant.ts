@@ -44,6 +44,7 @@ export async function assistantRoutes(app: FastifyInstance) {
       fixes,
       cfg: cfg ?? {},
       now,
+      discharges: body.discharges,
       run: (ids, extra) => simulate(cfg, { ...baseOpts, fixes: toObj(ids ?? []), shocks: shocks.concat(extra ?? []) }),
       best: (cb) => findBestPlan(cfg, baseOpts, cb),
     };

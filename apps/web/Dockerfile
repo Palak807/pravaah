@@ -17,4 +17,7 @@ RUN pnpm --filter @nabz/engine build && pnpm --filter @nabz/web build
 FROM nginx:alpine AS run
 COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/apps/web/dist /usr/share/nginx/html
+# Ensure nginx (non-root) can read every asset, including fonts copied with
+# restrictive source permissions (otherwise /fonts/*.woff2 returns 403).
+RUN chmod -R a+rX /usr/share/nginx/html
 EXPOSE 80

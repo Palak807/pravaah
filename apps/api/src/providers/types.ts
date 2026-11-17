@@ -16,6 +16,19 @@ import type {
   PlanTestResult,
 } from '@nabz/engine';
 
+/** A patient marked fit to go home, read off the ward register. */
+export interface DischargeRow {
+  bed: number;
+  name: string;
+  insured: boolean;
+}
+
+/** A surgery on the theatre (OT) list. */
+export interface TheatreCase {
+  name: string;
+  icu: boolean;
+}
+
 /** Numbers read off the three register photos. */
 export interface Reading {
   wardBeds: number;
@@ -26,6 +39,10 @@ export interface Reading {
   insured: number;
   stepDowns: number[];
   plannedAdmissions: number[];
+  /** The actual patients marked fit to go home (names + beds from the ward register). */
+  discharges?: DischargeRow[];
+  /** The actual surgeries on the theatre list. */
+  theatres?: TheatreCase[];
 }
 
 export interface ReadInput {
@@ -43,6 +60,8 @@ export interface AskContext {
   fixes: Partial<Record<FixId, boolean>>;
   cfg: Partial<Config>;
   now: number;
+  /** The real patients fit to go home (names + beds), when the photo was read. */
+  discharges?: DischargeRow[];
   run(ids?: FixId[], extra?: Shock[]): SimulationResult;
   best(cb?: (r: PlanTestResult) => void): BestPlanResult;
 }

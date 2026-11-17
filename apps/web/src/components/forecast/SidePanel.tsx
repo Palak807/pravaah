@@ -4,6 +4,20 @@ import { useStoreShallow, type ChatBot } from '../../store';
 
 const TRIES = ['ICU kab full hoga?', 'What should we do today?', 'अगर डिस्चार्ज राउंड सुबह कर दें तो?', 'What if a road accident brings 6 patients at 11?'];
 
+/** The model is told to reply in plain text, but if any markdown slips through we
+    render **bold** properly and strip stray markers rather than show raw asterisks. */
+function renderRich(text: string) {
+  const clean = text
+    .replace(/`([^`]+)`/g, '$1') // inline code
+    .replace(/^#{1,6}\s+/gm, '') // headings
+    .replace(/^\s*[-*]\s+/gm, '• '); // bullets -> dot
+  return clean.split(/(\*\*[^*]+\*\*)/g).map((part, i) => {
+    const m = part.match(/^\*\*([^*]+)\*\*$/);
+    if (m) return <strong key={i}>{m[1]}</strong>;
+    return <span key={i}>{part.replace(/[*_]{1,3}/g, '')}</span>;
+  });
+}
+
 export function AskTab() {
   const { chat, ask, usePlan } = useStoreShallow((s) => ({ chat: s.chat, ask: s.ask, usePlan: s.usePlan }));
   const [text, setText] = useState('');
@@ -38,7 +52,7 @@ export function AskTab() {
               )}
               {bot.ready ? (
                 <>
-                  {bot.text}
+                  {renderRich(bot.text)}
                   {bot.plan && bot.plan.length > 0 && (
                     <button className="btn small future" onClick={() => usePlan(bot.plan as FixId[])}>
                       Show this plan on the floor

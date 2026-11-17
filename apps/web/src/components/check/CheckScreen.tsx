@@ -1,7 +1,15 @@
+import { fmt } from '@nabz/engine';
 import { useStoreShallow } from '../../store';
 import { type ReadNumbers } from '../../sim';
 
 const SLOT = ['Bed register', 'Theatre list', 'ICU board & admissions'];
+
+/** "10:00 and 10:45" / "10:00, 11:30 and 14:00" */
+function joinTimes(mins: number[]): string {
+  const t = mins.map(fmt);
+  if (t.length <= 1) return t.join('');
+  return t.slice(0, -1).join(', ') + ' and ' + t[t.length - 1];
+}
 
 function StepRow({
   label,
@@ -49,13 +57,16 @@ function FixedRow({ label, hint, val }: { label: string; hint: string; val: numb
 }
 
 export function CheckScreen() {
-  const { numbers, flagYes, slots, setFlag, toForecast } = useStoreShallow((s) => ({
+  const { numbers, theatres, slots, toForecast } = useStoreShallow((s) => ({
     numbers: s.numbers,
-    flagYes: s.flagYes,
+    theatres: s.theatres,
     slots: s.slots,
-    setFlag: s.setFlag,
     toForecast: s.toForecast,
   }));
+
+  const surgeryCount = theatres.length || 7;
+  const icuSurgeries = theatres.length ? theatres.filter((t) => t.icu).length : 2;
+  const adm = numbers.plannedAdmissions;
 
   return (
     <div className="check">
@@ -77,22 +88,25 @@ export function CheckScreen() {
           <StepRow label="Ward beds occupied this morning" hint="From the bed register" k="wardOccupied" min={10} max={numbers.wardBeds} />
           <StepRow label="Patients fit to go home today" hint={'Rows marked "fit for d/c" or "छुट्टी"'} k="fitForDischarge" min={0} max={12} />
           <StepRow label="Of those, insured" hint="Rows marked &quot;TPA&quot;. Insured discharges take longer." k="insured" min={0} max={numbers.fitForDischarge} />
-          <FixedRow label="Surgeries today" hint="2 of them need an ICU bed afterwards. From the theatre list." val={7} />
-          <FixedRow label="ICU beds, all occupied" hint="2 patients are ready for the ward, at 10:00 and 10:45. From the ICU board." val={numbers.icuBeds} />
-          <FixedRow label="Admissions due this afternoon" hint="Between 13:35 and 16:15. From the ICU board page." val={numbers.plannedAdmissions.length} />
-          <div className="readrow ask">
-            <div>
-              <b>One discharge was hard to read.</b> I wasn't fully sure about one row and counted it as fit to go home. Is the count above right?
-              <div className="choice">
-                <button className="btn small" aria-pressed={flagYes} onClick={() => setFlag(true)}>
-                  Yes, fit to go home
-                </button>
-                <button className="btn small" aria-pressed={!flagYes} onClick={() => setFlag(false)}>
-                  No, staying today
-                </button>
-              </div>
-            </div>
-          </div>
+          <FixedRow
+            label="Surgeries today"
+            hint={`${icuSurgeries} of them need an ICU bed afterwards. From the theatre list.`}
+            val={surgeryCount}
+          />
+          <FixedRow
+            label="ICU beds occupied"
+            hint={
+              numbers.stepDowns.length
+                ? `${numbers.stepDowns.length} ${numbers.stepDowns.length === 1 ? 'patient is' : 'patients are'} ready for the ward, at ${joinTimes(numbers.stepDowns)}. From the ICU board.`
+                : 'From the ICU board.'
+            }
+            val={`${numbers.icuOccupied} of ${numbers.icuBeds}`}
+          />
+          <FixedRow
+            label="Admissions due this afternoon"
+            hint={adm.length ? `Due between ${fmt(Math.min(...adm))} and ${fmt(Math.max(...adm))}. From the ICU board page.` : 'From the ICU board page.'}
+            val={adm.length}
+          />
         </div>
         <div className="intro-actions">
           <button className="btn primary" onClick={toForecast}>

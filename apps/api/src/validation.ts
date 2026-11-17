@@ -43,6 +43,7 @@ export const askBody = z.object({
   fixes: fixesSchema.optional(),
   done: doneSchema.optional(),
   shocks: z.array(shockSchema).optional(),
+  discharges: z.array(z.object({ bed: z.number(), name: z.string(), insured: z.boolean() })).optional(),
 });
 
 export const readBody = z.object({
@@ -59,6 +60,8 @@ export const readingNumbers = z.object({
   insured: z.number(),
   stepDowns: z.array(z.number()),
   plannedAdmissions: z.array(z.number()),
+  discharges: z.array(z.object({ bed: z.number(), name: z.string(), insured: z.boolean() })).optional(),
+  theatres: z.array(z.object({ name: z.string(), icu: z.boolean() })).optional(),
 });
 
 export const createReadingBody = z.object({

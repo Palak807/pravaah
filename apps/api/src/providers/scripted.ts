@@ -178,14 +178,17 @@ const T: Record<string, Record<Lang, (v: any) => string>> = {
   },
   shock: {
     en: (v) =>
-      'I added that to today: ' + v.what + '. The forecast now shows ' + v.c + ' surgeries cancelled and emergency patients waiting ' + v.bh + ' hours for beds (it was ' + v.bh0 + ').' +
-      (v.planC != null ? ' With your plan in place: ' + v.planC + ' cancelled and ' + v.planBh + ' hours.' : ''),
+      'If that happened today — ' + v.what + ' — the forecast would show ' + v.c + ' surgeries cancelled and emergency patients waiting ' + v.bh + ' hours for beds (as things stand it is ' + v.bh0 + ').' +
+      (v.planC != null ? ' With your plan in place it would be ' + v.planC + ' cancelled and ' + v.planBh + ' hours.' : '') +
+      ' This is just a preview — the forecast on screen is unchanged.',
     hing: (v) =>
-      'Maine yeh aaj ke din mein jod diya: ' + v.what + '. Ab forecast mein ' + v.c + ' surgery cancel hai aur emergency ke patient bed ke liye ' + v.bh + ' ghante wait karte hain (pehle ' + v.bh0 + ' tha).' +
-      (v.planC != null ? ' Aapke plan ke saath: ' + v.planC + ' cancel aur ' + v.planBh + ' ghante.' : ''),
+      'Agar aaj aisa ho — ' + v.what + ' — to forecast mein ' + v.c + ' surgery cancel hongi aur emergency ke patient bed ke liye ' + v.bh + ' ghante wait karenge (abhi ' + v.bh0 + ' hai).' +
+      (v.planC != null ? ' Aapke plan ke saath ' + v.planC + ' cancel aur ' + v.planBh + ' ghante hote.' : '') +
+      ' Yeh sirf preview hai — screen par forecast waisa hi hai.',
     hi: (v) =>
-      'मैंने यह आज के दिन में जोड़ दिया: ' + v.what + '। अब फ़ोरकास्ट में ' + v.c + ' सर्जरी रद्द हैं और इमरजेंसी के मरीज़ बेड के लिए ' + v.bh + ' घंटे इंतज़ार करते हैं (पहले ' + v.bh0 + ' था)।' +
-      (v.planC != null ? ' आपके प्लान के साथ: ' + v.planC + ' रद्द और ' + v.planBh + ' घंटे।' : ''),
+      'अगर आज ऐसा हो — ' + v.what + ' — तो फ़ोरकास्ट में ' + v.c + ' सर्जरी रद्द होंगी और इमरजेंसी के मरीज़ बेड के लिए ' + v.bh + ' घंटे इंतज़ार करेंगे (अभी ' + v.bh0 + ' है)।' +
+      (v.planC != null ? ' आपके प्लान के साथ ' + v.planC + ' रद्द और ' + v.planBh + ' घंटे होते।' : '') +
+      ' यह सिर्फ़ एक पूर्वानुमान है — स्क्रीन पर फ़ोरकास्ट वैसा ही है।',
   },
   help: {
     en: () =>

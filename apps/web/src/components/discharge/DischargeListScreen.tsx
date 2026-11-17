@@ -1,17 +1,18 @@
 import { fmt, FIXES, type FixId } from '@nabz/engine';
 import { useStoreShallow } from '../../store';
-import { nameOf, docOf } from '../../sim';
+import { nameOf, docOf, dischargeIdentity } from '../../sim';
 import { L, FIX_WORDS, OWNER_HI } from '../../i18n';
 import { hrs } from '../forecast/helpers';
 
 const STEP_KEYS = ['order', 'summary', 'bill', 'approval'] as const;
 
 export function DischargeListScreen() {
-  const { base, plan, done, fixes, listLang, setListLang, tick, go } = useStoreShallow((s) => ({
+  const { base, plan, done, fixes, discharges, listLang, setListLang, tick, go } = useStoreShallow((s) => ({
     base: s.base,
     plan: s.plan,
     done: s.done,
     fixes: s.fixes,
+    discharges: s.discharges,
     listLang: s.listLang,
     setListLang: s.setListLang,
     tick: s.tick,
@@ -32,12 +33,19 @@ export function DischargeListScreen() {
   const planDis: Record<string, (typeof plan.dis)[number]> = {};
   plan.dis.forEach((d) => (planDis[d.id] = d));
 
+  // Map the engine's discharge patients onto the names/beds actually read off the register.
+  const idMap = dischargeIdentity(plan.dis, discharges);
+
   const pend: Record<string, number> = {};
 
   const cards = ps.map((p, i) => {
     const need = base.demand[i] || null;
     const d = done[p.id] || {};
-    const keys = STEP_KEYS.filter((k) => k !== 'approval' || p.insured);
+    const who = idMap[p.id];
+    const bedNo = who ? who.bed : p.bed;
+    const name = who ? who.name : nameOf(p.id);
+    const insured = who ? who.insured : p.insured;
+    const keys = STEP_KEYS.filter((k) => k !== 'approval' || insured);
     const clear = keys.every((k) => d[k]);
     const needText = !need
       ? t.none
@@ -67,8 +75,8 @@ export function DischargeListScreen() {
       <div className={'card' + (clear ? ' clear' : '')} key={p.id}>
         <div className="num rank">{i + 1}</div>
         <h3>
-          {t.bed} {p.bed}, {nameOf(p.id)}
-          <small>{p.insured ? t.insured : t.cash}</small>
+          {t.bed} {bedNo}, {name}
+          <small>{insured ? t.insured : t.cash}</small>
         </h3>
         <div className="need">
           {needText} {when}

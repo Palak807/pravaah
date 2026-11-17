@@ -1,7 +1,9 @@
 /* Thin API client. Same-origin: dev proxies /api to the API server, prod serves via nginx.
    Heavy jobs (best-plan) and the assistant go to the server; single simulations run locally. */
 import type { Config, SimulateOpts, BestPlanResult, FixId, Shock } from '@nabz/engine';
-import type { ReadNumbers } from '../sim';
+import type { ReadNumbers, DischargeRow, TheatreCase } from '../sim';
+
+export type ReadResult = ReadNumbers & { discharges?: DischargeRow[]; theatres?: TheatreCase[] };
 
 async function post<T>(url: string, body: unknown): Promise<T> {
   const res = await fetch(url, {
@@ -32,7 +34,7 @@ export interface AskAnswer {
 
 export const api = {
   readRegisters(images: string[]) {
-    return post<{ provider: string; numbers: ReadNumbers }>('/api/assistant/read', { images });
+    return post<{ provider: string; numbers: ReadResult }>('/api/assistant/read', { images });
   },
 
   ask(params: {
@@ -43,6 +45,7 @@ export const api = {
     fixes?: Record<string, boolean>;
     done?: Record<string, Record<string, boolean>>;
     shocks?: Shock[];
+    discharges?: DischargeRow[];
   }) {
     return post<{ provider: string; answer: AskAnswer }>('/api/assistant/ask', params);
   },
@@ -51,7 +54,7 @@ export const api = {
     return post<BestPlanResult>('/api/best-plan', { cfg, opts });
   },
 
-  createReading(numbers: ReadNumbers, photoRefs?: unknown) {
+  createReading(numbers: ReadResult, photoRefs?: unknown) {
     return post<{ id: string }>('/api/readings', { numbers, photoRefs });
   },
   createDay(body: { readingId: string; seed?: string; fixes?: Record<string, boolean>; done?: unknown; shocks?: Shock[] }) {

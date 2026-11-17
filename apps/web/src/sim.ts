@@ -1,6 +1,6 @@
 /* Client-side engine helpers: patient names, config assembly, snapshot lookup.
    The engine runs in the browser so scrubbing/playback is instant. */
-import { simulate, DAY_START, SNAP, type Config, type SimulationResult, type Snapshot } from '@nabz/engine';
+import { simulate, DAY_START, SNAP, type Config, type SimulationResult, type Snapshot, type SurgeryCaseDef, type DischargePatient } from '@nabz/engine';
 
 export interface ReadNumbers {
   wardBeds: number;
@@ -11,6 +11,18 @@ export interface ReadNumbers {
   insured: number;
   stepDowns: number[];
   plannedAdmissions: number[];
+}
+
+/** A patient marked fit to go home, read off the ward register. */
+export interface DischargeRow {
+  bed: number;
+  name: string;
+  insured: boolean;
+}
+/** A surgery read off the operating-theatre list. */
+export interface TheatreCase {
+  name: string;
+  icu: boolean;
 }
 
 export const SAMPLE_NUMBERS: ReadNumbers = {
@@ -57,13 +69,34 @@ export function docOf(pid: string): string {
   return DOCS[parseInt(pid.slice(1), 10) % DOCS.length];
 }
 
-/** Build the engine config from the checked register numbers + the "flag" answer. */
-export function buildConfig(numbers: ReadNumbers, flagYes: boolean): Partial<Config> {
-  const c: ReadNumbers = { ...numbers };
+/** Turn the OCR'd theatre list into the engine's theatre layout (up to two theatres). */
+export function theatresToConfig(cases: TheatreCase[]): SurgeryCaseDef[][] {
+  const t: SurgeryCaseDef[][] = [[], []];
+  cases.forEach((c, i) => t[i % 2].push({ name: c.name, est: c.icu ? 110 : 85, icu: !!c.icu }));
+  return t.filter((theatre) => theatre.length > 0);
+}
+
+/** Build the engine config from the checked register numbers (+ the real theatre list, if read). */
+export function buildConfig(numbers: ReadNumbers, flagYes: boolean, theatres?: TheatreCase[]): Partial<Config> {
+  const c: Partial<Config> & ReadNumbers = { ...numbers };
   if (!flagYes) c.fitForDischarge = Math.max(0, c.fitForDischarge - 1);
   c.insured = Math.min(c.insured, c.fitForDischarge);
   c.wardOccupied = Math.min(c.wardOccupied, c.wardBeds);
+  if (theatres && theatres.length) c.theatres = theatresToConfig(theatres);
   return c as Partial<Config>;
+}
+
+/** Pair the engine's discharge patients with the names/beds actually read off the register.
+    Both are sorted by bed and paired by position, so each card shows a real patient. */
+export function dischargeIdentity(dis: DischargePatient[], discharges?: DischargeRow[]): Record<string, DischargeRow> {
+  if (!discharges || !discharges.length) return {};
+  const byBed = [...dis].sort((a, b) => a.bed - b.bed);
+  const ocr = [...discharges].sort((a, b) => a.bed - b.bed);
+  const map: Record<string, DischargeRow> = {};
+  byBed.forEach((d, i) => {
+    if (ocr[i]) map[d.id] = ocr[i];
+  });
+  return map;
 }
 
 export function snapAt(r: SimulationResult, t: number): Snapshot {
