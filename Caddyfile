@@ -6,5 +6,12 @@
 
 {$DOMAIN} {
 	encode zstd gzip
+	basic_auth {
+		pravaah $2a$14$jx1jEy8Imw8OILFDLXVO7.xPdF.tc47rCDtSx9vbTMhRf/AlHE3TC
+	}
 	reverse_proxy web:80
+}
+
+www.{$DOMAIN} {
+	redir https://{$DOMAIN}{uri} permanent
 }
