@@ -1,0 +1,53 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-nabz}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nabz_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-nabz}
+    volumes:
+      - nabz_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-nabz} -d ${POSTGRES_DB:-nabz}']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    ports:
+      - '${DB_PORT:-5432}:5432'
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-nabz}:${POSTGRES_PASSWORD:-nabz_dev_password}@db:5432/${POSTGRES_DB:-nabz}?schema=public
+      API_PORT: '3000'
+      HOSPITAL_NAME: ${HOSPITAL_NAME:-Sunrise Nursing Home}
+      ASSISTANT_PROVIDER: ${ASSISTANT_PROVIDER:-scripted}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-6}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      CONTACT_TO: ${CONTACT_TO:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - '${API_PORT:-3000}:3000'
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - '${WEB_PORT:-8080}:80'
+
+volumes:
+  nabz_db:

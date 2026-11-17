@@ -1,0 +1,73 @@
+// Nabz data model.
+// Single-hospital, no-auth in this pass — but the shape is future-proofed:
+// a User table exists (unused), and nullable createdById FKs mean adding auth +
+// multi-hospital later is a non-breaking migration.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Hospital {
+  id         String    @id @default(cuid())
+  name       String
+  baseConfig Json // engine Config overrides for this hospital (ward size, theatres, etc.)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  readings   Reading[]
+  days       Day[]
+}
+
+model Reading {
+  id          String   @id @default(cuid())
+  hospital    Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  hospitalId  String
+  date        DateTime @default(now())
+  numbers     Json // confirmed register numbers (wardBeds, fitForDischarge, insured, stepDowns, plannedAdmissions, ...)
+  photoRefs   Json? // opaque references/URLs to the uploaded register photos
+  createdById String? // nullable now; becomes a real User FK when auth lands
+  createdAt   DateTime @default(now())
+  days        Day[]
+
+  @@index([hospitalId, date])
+}
+
+model Day {
+  id         String          @id @default(cuid())
+  hospital   Hospital        @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  hospitalId String
+  reading    Reading         @relation(fields: [readingId], references: [id], onDelete: Cascade)
+  readingId  String
+  seed       String          @default("day-2")
+  fixes      Json            @default("{}") // { earlyRound: true, ... }
+  done       Json            @default("{}") // per-patient ticked steps
+  shocks     Json            @default("[]") // [{ type, at }]
+  createdById String?
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  runs       SimulationRun[]
+
+  @@index([hospitalId, createdAt])
+}
+
+model SimulationRun {
+  id        String   @id @default(cuid())
+  day       Day      @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  dayId     String
+  metrics   Json // cached engine metrics for this day's current plan
+  computedAt DateTime @default(now())
+
+  @@index([dayId])
+}
+
+// Reserved for a future auth pass; not referenced by the API yet.
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  role      String   @default("staff")
+  createdAt DateTime @default(now())
+}

@@ -1,0 +1,12 @@
+**/node_modules
+**/dist
+**/build
+**/.turbo
+**/*.tsbuildinfo
+.git
+.env
+.env.local
+legacy
+**/coverage
+**/*.log
+.DS_Store

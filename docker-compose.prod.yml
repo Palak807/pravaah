@@ -1,0 +1,72 @@
+# Production stack for a single VPS (e.g. GoDaddy 4 vCPU / 8 GB Docker server).
+# Caddy terminates TLS (automatic Let's Encrypt) and is the only service exposed
+# to the internet. db / api / web stay on the internal network.
+#
+# Usage on the server:
+#   cp .env.example .env    # fill in secrets + DOMAIN + ACME_EMAIL + SMTP_*
+#   docker compose -f docker-compose.prod.yml up -d --build
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-nabz}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-nabz}
+    volumes:
+      - nabz_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-nabz} -d ${POSTGRES_DB:-nabz}']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-nabz}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-nabz}?schema=public
+      API_PORT: '3000'
+      HOSPITAL_NAME: ${HOSPITAL_NAME:-Sunrise Nursing Home}
+      ASSISTANT_PROVIDER: ${ASSISTANT_PROVIDER:-model}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-6}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      CONTACT_TO: ${CONTACT_TO:-}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+
+volumes:
+  nabz_db:
+  caddy_data:
+  caddy_config:
