@@ -40,7 +40,7 @@ export function Header() {
         className="demo"
         title="The hospital, patients and registers are invented. The assistant runs on Claude, and every number is computed by the simulation."
       >
-        Sample day, not real patients
+        Sample data
       </div>
     </header>
   );
