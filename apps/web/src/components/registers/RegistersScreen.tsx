@@ -1,6 +1,10 @@
+import { useState } from 'react';
 import { useStoreShallow } from '../../store';
 
 const SLOT = ['Bed register', 'Theatre list', 'ICU board & admissions'];
+
+/** The three demo register photos bundled with the app (served from /public/samples). */
+const SAMPLES = ['/samples/ward.png', '/samples/ot.png', '/samples/icu.png'];
 
 /** Downscale a chosen photo to keep the upload small and OCR fast. */
 function downscale(file: File, maxDim = 1600): Promise<string> {
@@ -39,6 +43,7 @@ export function RegistersScreen() {
     go: s.go,
   }));
 
+  const [loadingSamples, setLoadingSamples] = useState(false);
   const all = slots.every((x) => x);
 
   const onFile = async (i: number, e: React.ChangeEvent<HTMLInputElement>) => {
@@ -46,6 +51,24 @@ export function RegistersScreen() {
     if (!file) return;
     const dataUrl = await downscale(file);
     setSlot(i, dataUrl);
+  };
+
+  /* Load the bundled demo photos into all three slots, so the same OCR runs on them. */
+  const useSamples = async () => {
+    setLoadingSamples(true);
+    try {
+      for (let i = 0; i < SAMPLES.length; i++) {
+        const res = await fetch(SAMPLES[i]);
+        const blob = await res.blob();
+        const file = new File([blob], `sample-${i}.png`, { type: blob.type || 'image/png' });
+        const dataUrl = await downscale(file);
+        setSlot(i, dataUrl);
+      }
+    } catch (e) {
+      console.warn('[samples] could not load demo photos', e);
+    } finally {
+      setLoadingSamples(false);
+    }
   };
 
   return (
@@ -67,7 +90,16 @@ export function RegistersScreen() {
               </button>
             )
           )}
-          {!all && !reading && !readDone && <span className="lede" style={{ margin: 0, fontSize: 15 }}>Add all three photos to continue.</span>}
+          {!all && !reading && !readDone && (
+            <>
+              <button className="btn" disabled={loadingSamples} onClick={useSamples}>
+                {loadingSamples ? 'Loading sample photos…' : 'Use sample photos'}
+              </button>
+              <span className="lede" style={{ margin: 0, fontSize: 15 }}>
+                No registers handy? Load our three sample pages, or add your own photos.
+              </span>
+            </>
+          )}
         </div>
       </section>
       <div className="papers">
